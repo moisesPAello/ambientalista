@@ -6,6 +6,7 @@ import requests
 from typing import List
 import pytz
 from dateutil import parser
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -17,6 +18,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Modelo para la petición
+class FechaRequest(BaseModel):
+    fecha_inicio: str
+    dias_habiles: int = 45
 
 # Zona horaria de México
 MEXICO_TZ = pytz.timezone('America/Mexico_City')
@@ -56,11 +62,11 @@ class FechaCalculadora:
         return fecha_actual
 
 @app.post("/calcular-fecha-limite")
-async def calcular_fecha_limite(fecha_inicio: str, dias_habiles: int = 45):
+async def calcular_fecha_limite(request: FechaRequest):
     try:
         # Intentar parsear la fecha en diferentes formatos
         try:
-            fecha_inicio_dt = parser.parse(fecha_inicio, dayfirst=True)
+            fecha_inicio_dt = parser.parse(request.fecha_inicio, dayfirst=True)
         except ValueError:
             raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use DD/MM/YYYY o YYYY-MM-DD")
 
@@ -75,11 +81,11 @@ async def calcular_fecha_limite(fecha_inicio: str, dias_habiles: int = 45):
         calculadora.dias_inhabiles = await calculadora.obtener_dias_inhabiles()
         
         # Calcular fecha límite
-        fecha_limite = calculadora.calcular_fecha_limite(fecha_inicio_dt, dias_habiles)
+        fecha_limite = calculadora.calcular_fecha_limite(fecha_inicio_dt, request.dias_habiles)
         
         return {
             "fecha_inicio": fecha_inicio_dt.strftime("%d/%m/%Y"),
-            "dias_habiles": dias_habiles,
+            "dias_habiles": request.dias_habiles,
             "fecha_limite": fecha_limite.strftime("%d/%m/%Y")
         }
     except ValueError as e:
